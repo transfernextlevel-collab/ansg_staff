@@ -16,7 +16,7 @@ on:
       friendly_name:
         description: '📛  Nom convivial du certificat'
         required: true
-        default: 'NLPH Staff PWA'                 # ← CHANGER ICI
+        default: 'NLPH Staff'                 # ← CHANGER ICI
 
       pfx_password:
         description: '🔑  Mot de passe du fichier .pfx'
