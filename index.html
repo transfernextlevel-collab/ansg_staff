@@ -572,11 +572,6 @@ html[data-theme="dark"] .modal-msg.error{color:#fca5a5}
   .toast{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));max-width:none}
 }
 </style>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="NLPH Staff">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
 
@@ -2846,15 +2841,19 @@ async function openDetail(id){
       if(agData.success){
         let ag=agData.agencia;
         const raw=agData.telefoneWhatsapp||agData.telefoneWA||(ag&&ag.telefoneWhatsapp)||'';
-        if(!ag&&raw){
+        if(raw){
           const p=parseWaCampoAgenciaClient(raw);
-          ag={telefoneWhatsapp:raw,useWA:agData.useWA,whatsappGroupUrl:p.groupUrl,whatsappNumerosWaMe:p.numeros,whatsappNumerosAffiche:p.disp};
-        }else if(ag&&(!ag.whatsappNumerosWaMe||!ag.whatsappNumerosWaMe.length)&&raw){
-          const p=parseWaCampoAgenciaClient(raw);
-          ag.whatsappGroupUrl=ag.whatsappGroupUrl||p.groupUrl;
-          ag.whatsappNumerosWaMe=p.numeros;
-          ag.whatsappNumerosAffiche=p.disp;
+          if(!ag){
+            ag={telefoneWhatsapp:raw,useWA:agData.useWA,whatsappGroupUrl:p.groupUrl,whatsappNumerosWaMe:p.numeros,whatsappNumerosAffiche:p.disp};
+          }else{
+            if(p.groupUrl) ag.whatsappGroupUrl=ag.whatsappGroupUrl||p.groupUrl;
+            if((!ag.whatsappNumerosWaMe||!ag.whatsappNumerosWaMe.length)&&p.numeros.length){
+              ag.whatsappNumerosWaMe=p.numeros;
+              ag.whatsappNumerosAffiche=p.disp;
+            }
+          }
         }
+        if(ag&&ag.whatsappGroupUrl) ag.whatsappGroupUrl=canonicalWaGroupInviteUrl(ag.whatsappGroupUrl);
         const useWa=ag?.useWA||ag?.useWhatsapp||agData.useWA||'nao';
         if(useWa!=='sim'&&useWa!=='SIM'){agWaBox.style.display='none';}
         else{
@@ -2986,7 +2985,7 @@ function updateAgWaMainButtonLabel(){
   }
 }
 function openAgWAGroup(){
-  const u=S.curAgWa&&S.curAgWa.whatsappGroupUrl;
+  const u=canonicalWaGroupInviteUrl(S.curAgWa&&S.curAgWa.whatsappGroupUrl);
   if(!u){toast('⚠️ Sem link de grupo WhatsApp — configure em Gestão de Agências (link chat.whatsapp.com)','warn');return;}
   const open=()=>{ window.open(u,'_blank'); };
   if(S.curWaResa){
@@ -3579,6 +3578,17 @@ function downloadCSV(rows,name){
 // GESTION AGENCES — WhatsApp multi-lignes (+, 00, lien groupe)
 // Normalisation alignée sur ERP : +351…, 00351…, tel:, espaces/tirets unicode
 // ═══════════════════════════════════════════════════════════
+/** Retire ?query et #fragment des invitations chat.whatsapp.com (ex. ?mode=gi_t depuis Google). */
+function canonicalWaGroupInviteUrl(u){
+  if(!u) return '';
+  const s0=String(u).trim().replace(/^\uFEFF/,'').split(/\s+/)[0];
+  if(!/^https?:\/\/(chat\.)?whatsapp\.com\//i.test(s0)) return String(u).trim();
+  const qi=s0.indexOf('?'), hi=s0.indexOf('#');
+  let end=s0.length;
+  if(qi>=0) end=Math.min(end,qi);
+  if(hi>=0) end=Math.min(end,hi);
+  return end<s0.length ? s0.slice(0,end) : s0;
+}
 function normaliserDigitsPourWaMeClient(s){
   s=String(s||'').trim();
   if(!s)return'';
@@ -3595,7 +3605,7 @@ function parseWaCampoAgenciaClient(raw){
   for(const p of parts){
     if(/^https?:\/\/(chat\.)?whatsapp\.com\//i.test(p)){
       const m=p.match(/^https?:\/\/(chat\.)?whatsapp\.com\/[^\s]+/i);
-      if(m&&!groupUrl) groupUrl=m[0];
+      if(m&&!groupUrl) groupUrl=canonicalWaGroupInviteUrl(m[0]);
       continue;
     }
     const digits=normaliserDigitsPourWaMeClient(p);
@@ -3914,10 +3924,5 @@ document.addEventListener('keydown',e=>{
 })();
 </script>
 <div id="toast" class="toast"></div>
-
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js', { scope: './' }).catch(function () {});
-}
-</script></body>
+</body>
 </html>
